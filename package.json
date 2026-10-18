@@ -1,0 +1,17 @@
+{
+  "name": "flight-log",
+  "private": true,
+  "description": "搭乗記録（iPhone 向け PWA）。ビルド不要。ここにあるのは開発用の道具だけです。",
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "preview": "node tools/build-preview.mjs",
+    "check": "node tools/check.mjs",
+    "test": "node tools/check.mjs && playwright test",
+    "test:headed": "playwright test --headed",
+    "release": "node tools/release.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

@@ -81,7 +81,11 @@ iPhoneのホーム画面から起動する記録アプリです。機内のオ�
 
 ## 更新するとき
 
-ファイルを書き換えて push したら、`sw.js` 冒頭の `CACHE = "skylog-v1.3.0"` の数字を上げてください。上げないと古い画面がキャッシュに残ります。
+手順と更新履歴は [UPDATE.md](UPDATE.md) にあります。番号は `npm run release -- 1.3.1` で上げます（`sw.js` を手で書き換えない）。
+
+## 開発するとき
+
+`C:\dev\搭乗記録` で `setup.cmd` を一度実行してから、Claude Code で作業します。決まりごとは [CLAUDE.md](CLAUDE.md)、設計メモは [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## 注意
 

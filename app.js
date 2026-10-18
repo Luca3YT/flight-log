@@ -4,7 +4,7 @@
 
   var D = window.SKYDATA;
   var KEY = "skylog.v1";
-  var VERSION = "1.3.0";
+  var VERSION = "1.4.0";
   var ORDER = ["unknown", "green", "yellow", "red", "black"];
   var RLABEL = { green: "真横", yellow: "ほぼ真横", red: "見にくい", black: "窓なし", unknown: "未判定" };
   var STEPS = [
@@ -692,13 +692,13 @@
     var m = b.mark, fs = m.length >= 3 ? 23 : m.length === 2 ? 27 : 34;
     var face = on
       ? '<circle cx="50" cy="50" r="47" fill="url(#mdRim)"/><circle cx="50" cy="50" r="40.5" fill="url(#mdFace)"/>' +
-        '<circle cx="50" cy="50" r="35.5" fill="none" stroke="#C9A86A" stroke-opacity=".6" stroke-width="1.3" stroke-dasharray=".1 4.4" stroke-linecap="round"/>'
-      : '<circle cx="50" cy="50" r="47" fill="url(#mdOff)"/><circle cx="50" cy="50" r="40.5" fill="#0F1A2B"/>' +
-        (prog > 0 ? '<circle cx="50" cy="50" r="47" fill="none" stroke="#C9A86A" stroke-opacity=".85" stroke-width="3" pathLength="100" stroke-dasharray="' +
+        '<circle cx="50" cy="50" r="35.5" fill="none" style="stroke:var(--md-r2)" stroke-opacity=".6" stroke-width="1.3" stroke-dasharray=".1 4.4" stroke-linecap="round"/>'
+      : '<circle cx="50" cy="50" r="47" fill="url(#mdOff)"/><circle cx="50" cy="50" r="40.5" style="fill:var(--md-of)"/>' +
+        (prog > 0 ? '<circle cx="50" cy="50" r="47" fill="none" style="stroke:var(--brass)" stroke-opacity=".85" stroke-width="3" pathLength="100" stroke-dasharray="' +
           (Math.min(1, prog) * 100).toFixed(1) + ' 100" transform="rotate(-90 50 50)" stroke-linecap="round"/>' : "");
     return '<svg viewBox="0 0 100 100" aria-hidden="true">' + face +
       '<text x="50" y="' + (50 + fs * 0.36).toFixed(1) + '" text-anchor="middle" font-family="Shippori Mincho B1, Hiragino Mincho ProN, Noto Serif CJK JP, serif" font-weight="600" font-size="' + fs +
-      '" fill="' + (on ? "#EAD5A6" : "#4A5870") + '">' + esc(m) + "</text></svg>";
+      '" style="fill:var(' + (on ? "--md-mk" : "--md-mko") + ')">' + esc(m) + "</text></svg>";
   }
   function badgesCardHTML() {
     var st = flightStats(db.flights), got = 0;
@@ -717,7 +717,7 @@
       : fmtNum(Math.min(cur, b.goal)) + " / " + fmtNum(b.goal) + " " + unit;
     var when = db.badges[id] ? dots(db.badges[id]) + " に解除" : on ? "達成済み" : "";
     openSheet('<div class="medal-detail">' + medalSVG(b, on, cur / b.goal) + "<h3>" + esc(b.name) + "</h3><p>" + esc(b.desc) + "</p>" +
-      (on ? '<p class="num" style="color:var(--brass-hi)">' + esc(when) + "</p>"
+      (on ? '<p class="num" style="color:var(--accent-text)">' + esc(when) + "</p>"
         : '<div class="prog"><i style="width:' + Math.min(100, cur / b.goal * 100).toFixed(1) + '%"></i></div><p class="num">' + esc(progText) + "</p>") +
       '</div><div class="btns one" style="margin-top:16px"><button type="button" class="btn line" data-act="sheet-close">閉じる</button></div>');
   }
@@ -813,49 +813,50 @@
       ? Promise.all([document.fonts.load('600 80px "Shippori Mincho B1"'), document.fonts.load('700 30px "Zen Kaku Gothic New"'), document.fonts.load('400 30px "Zen Kaku Gothic New"')]).catch(function () {})
       : Promise.resolve();
     return fontsReady.then(function () {
+      var C = themeColors();
       var W = 1080, H = 1350, cv = document.createElement("canvas");
       cv.width = W; cv.height = H;
       var c = cv.getContext("2d");
       var g = c.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "#16294A"); g.addColorStop(0.5, "#0C1626"); g.addColorStop(1, "#060B15");
+      g.addColorStop(0, C("rc-1")); g.addColorStop(0.5, C("rc-2")); g.addColorStop(1, C("rc-3"));
       c.fillStyle = g; c.fillRect(0, 0, W, H);
       var rg = c.createRadialGradient(W / 2, 520, 0, W / 2, 520, 620);
-      rg.addColorStop(0, "rgba(201,168,106,0.10)"); rg.addColorStop(1, "rgba(201,168,106,0)");
+      rg.addColorStop(0, C("accent-rgb", 0.10)); rg.addColorStop(1, C("accent-rgb", 0));
       c.fillStyle = rg; c.fillRect(0, 0, W, H);
       // header
       c.textBaseline = "alphabetic";
-      c.fillStyle = "#C9A86A"; c.font = "600 30px " + SERIF;
+      c.fillStyle = C("brass"); c.font = "600 30px " + SERIF;
       spaced(c, "搭乗記録", 72, 104, 10, "left");
       var first = list[0], last = list[list.length - 1];
-      c.fillStyle = "#8E98A8"; c.font = "400 26px " + SANS; c.textAlign = "right";
+      c.fillStyle = C("muted"); c.font = "400 26px " + SANS; c.textAlign = "right";
       if (first) c.fillText(dots(first.date) + "  —  " + dots(last.date), W - 72, 104);
       c.textAlign = "left";
       var lab = periodLabel(kind, key);
-      c.fillStyle = "#ECE8DF"; c.font = "600 92px " + SERIF;
+      c.fillStyle = C("text"); c.font = "600 92px " + SERIF;
       var bw = spaced(c, lab.big, 68, 232, 4, "left");
-      c.fillStyle = "#E6CE9B"; c.font = "600 38px " + SERIF;
+      c.fillStyle = C("accent-text"); c.font = "600 38px " + SERIF;
       spaced(c, lab.sub, 68 + bw + 24, 228, 6, "left");
       // map
       var mx = 60, my = 280, mw = 960, mh = 560, rd = routeData(list), box = mapBox(rd, "fit", mh / mw, 120), sc = mw / box.w;
       c.save(); roundRect(c, mx, my, mw, mh, 26); c.clip();
-      c.fillStyle = "rgba(10,20,36,0.55)"; c.fillRect(mx, my, mw, mh);
+      c.fillStyle = C("rc-panel"); c.fillRect(mx, my, mw, mh);
       c.translate(mx, my); c.scale(sc, sc); c.translate(-box.x, -box.y);
       var land = new Path2D(D.JAPAN_PATH);
-      c.fillStyle = "#1A3050"; c.fill(land);
-      c.strokeStyle = "rgba(201,168,106,0.42)"; c.lineWidth = 1.6 / sc; c.lineJoin = "round"; c.stroke(land);
+      c.fillStyle = C("rc-land"); c.fill(land);
+      c.strokeStyle = C("accent-rgb", 0.42); c.lineWidth = 1.6 / sc; c.lineJoin = "round"; c.stroke(land);
       var maxC = rd.routes[rd.keys[0]] || 1;
       rd.keys.slice().reverse().forEach(function (k) {
         var ab = k.split("-"), r = arcOf(ab[0], ab[1]), wgt = Math.sqrt(rd.routes[k] / maxC);
         c.beginPath(); c.moveTo(r.p[0], r.p[1]); c.quadraticCurveTo(r.c[0], r.c[1], r.q[0], r.q[1]);
         c.lineCap = "round";
-        c.strokeStyle = "rgba(201,168,106,0.18)"; c.lineWidth = (14 + 22 * wgt) / sc; c.stroke();
-        c.strokeStyle = "#D9BC80"; c.lineWidth = (3 + 6 * wgt) / sc; c.stroke();
+        c.strokeStyle = C("accent-rgb", 0.18); c.lineWidth = (14 + 22 * wgt) / sc; c.stroke();
+        c.strokeStyle = C("rc-route"); c.lineWidth = (3 + 6 * wgt) / sc; c.stroke();
       });
       var apk = Object.keys(rd.aps).sort(function (a, b) { return rd.aps[b] - rd.aps[a]; }), maxA = rd.aps[apk[0]] || 1;
       apk.forEach(function (code) {
         var p = pxy(code), r = (7 + 7 * Math.sqrt(rd.aps[code] / maxA)) / sc;
-        c.fillStyle = "rgba(201,168,106,0.22)"; c.beginPath(); c.arc(p[0], p[1], r * 2.2, 0, Math.PI * 2); c.fill();
-        c.fillStyle = "#F0DCAE"; c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); c.fill();
+        c.fillStyle = C("accent-rgb", 0.22); c.beginPath(); c.arc(p[0], p[1], r * 2.2, 0, Math.PI * 2); c.fill();
+        c.fillStyle = C("rc-ap"); c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2); c.fill();
       });
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.font = "700 28px " + SANS; c.lineJoin = "round";
@@ -864,22 +865,22 @@
         var r = 7 + 7 * Math.sqrt(rd.aps[code] / maxA);
         c.textAlign = right ? "right" : "left";
         var tx = x + (right ? -1 : 1) * (r + 12);
-        c.strokeStyle = "#0B1525"; c.lineWidth = 8; c.strokeText(code, tx, y + 10);
-        c.fillStyle = "#ECE8DF"; c.fillText(code, tx, y + 10);
+        c.strokeStyle = C("map-2"); c.lineWidth = 8; c.strokeText(code, tx, y + 10);
+        c.fillStyle = C("text"); c.fillText(code, tx, y + 10);
       });
       c.textAlign = "left";
       c.restore();
-      c.strokeStyle = "rgba(201,168,106,0.25)"; c.lineWidth = 2; roundRect(c, mx, my, mw, mh, 26); c.stroke();
+      c.strokeStyle = C("accent-rgb", 0.25); c.lineWidth = 2; roundRect(c, mx, my, mw, mh, 26); c.stroke();
       // boarding-pass panel
       var st = flightStats(list), px = 60, py = 880, pw = 960, ph = 360, stubW = 300, sx = px + pw - stubW;
       var paper = c.createLinearGradient(0, py, 0, py + ph);
-      paper.addColorStop(0, "#F4F5F7"); paper.addColorStop(0.6, "#EEF0F3"); paper.addColorStop(1, "#E3E7ED");
+      paper.addColorStop(0, C("paper-top")); paper.addColorStop(0.6, C("pearl")); paper.addColorStop(1, C("paper-bot"));
       c.save();
-      c.shadowColor = "rgba(0,0,0,0.5)"; c.shadowBlur = 40; c.shadowOffsetY = 18;
+      c.shadowColor = C("ticket-shadow"); c.shadowBlur = 40; c.shadowOffsetY = 18;
       roundRect(c, px, py, pw, ph, 28); c.fillStyle = paper; c.fill();
       c.restore();
       c.save(); roundRect(c, px, py, pw, ph, 28); c.clip();
-      c.fillStyle = "#C9A86A"; c.fillRect(px, py, pw, 10);
+      c.fillStyle = C("brass"); c.fillRect(px, py, pw, 10);
       c.restore();
       // notches + perforation
       c.save(); c.globalCompositeOperation = "destination-out";
@@ -895,15 +896,15 @@
         return size;
       };
       var cell = function (label, value, unit, x, y, size, maxW) {
-        c.fillStyle = "#5D6879"; c.font = "400 25px " + SANS; c.fillText(label, x, y);
+        c.fillStyle = C("ink-soft"); c.font = "400 25px " + SANS; c.fillText(label, x, y);
         c.font = "400 28px " + SANS;
         var uw = unit ? c.measureText(unit).width + 12 : 0;
         var base = size;
         size = fit(value, size, maxW, uw);
-        c.fillStyle = "#18212F";
+        c.fillStyle = C("ink");
         var by = y + base * 0.98;
         c.fillText(value, x, by);
-        if (unit) { var vw = c.measureText(value).width; c.fillStyle = "#5D6879"; c.font = "400 28px " + SANS; c.fillText(unit, x + vw + 10, by); }
+        if (unit) { var vw = c.measureText(value).width; c.fillStyle = C("ink-soft"); c.font = "400 28px " + SANS; c.fillText(unit, x + vw + 10, by); }
       };
       cell("搭乗", String(st.n), "便", px + 52, py + 74, 112, 220);
       cell("飛行距離", fmtNum(st.km), "km", px + 300, py + 74, 112, sx - 40 - (px + 300));
@@ -913,21 +914,21 @@
       cell("路線", String(rd.keys.length), "", px + 380, row2, 58, 120);
       var topReg = Object.keys(st.regs).sort(function (a, b) { return st.regs[b] - st.regs[a]; })[0];
       var lx = sx + 40;
-      c.fillStyle = "#5D6879"; c.font = "400 25px " + SANS; c.fillText("よく乗った機体", lx, py + 74);
-      c.fillStyle = "#18212F"; fit(topReg || "—", 52, stubW - 64); c.fillText(topReg || "—", lx, py + 138);
-      if (topReg) { c.fillStyle = "#8D7446"; c.font = "700 25px " + SANS; c.fillText(st.regs[topReg] + "回", lx, py + 176); }
+      c.fillStyle = C("ink-soft"); c.font = "400 25px " + SANS; c.fillText("よく乗った機体", lx, py + 74);
+      c.fillStyle = C("ink"); fit(topReg || "—", 52, stubW - 64); c.fillText(topReg || "—", lx, py + 138);
+      if (topReg) { c.fillStyle = C("paper-accent"); c.font = "700 25px " + SANS; c.fillText(st.regs[topReg] + "回", lx, py + 176); }
       var longest = list.slice().sort(function (a, b) { return km(b.from, b.to) - km(a.from, a.to); })[0];
-      c.fillStyle = "#5D6879"; c.font = "400 25px " + SANS; c.fillText("最長区間", lx, row2);
+      c.fillStyle = C("ink-soft"); c.font = "400 25px " + SANS; c.fillText("最長区間", lx, row2);
       if (longest) {
         var lt = longest.from + " – " + longest.to;
-        c.fillStyle = "#18212F"; fit(lt, 40, stubW - 64); c.fillText(lt, lx, row2 + 50);
-        c.fillStyle = "#8D7446"; c.font = "700 25px " + SANS; c.fillText(fmtNum(km(longest.from, longest.to)) + " km", lx, row2 + 88);
+        c.fillStyle = C("ink"); fit(lt, 40, stubW - 64); c.fillText(lt, lx, row2 + 50);
+        c.fillStyle = C("paper-accent"); c.font = "700 25px " + SANS; c.fillText(fmtNum(km(longest.from, longest.to)) + " km", lx, row2 + 88);
       }
       // footer: most flown route
       var tr = rd.keys[0];
       if (tr) {
         var ab = tr.split("-");
-        c.fillStyle = "#8E98A8"; c.font = "400 26px " + SANS; c.textAlign = "center";
+        c.fillStyle = C("muted"); c.font = "400 26px " + SANS; c.textAlign = "center";
         c.fillText("いちばん飛んだ路線  " + apName(ab[0]) + " ⇄ " + apName(ab[1]) + "  " + rd.routes[tr] + "便", W / 2, 1300);
         c.textAlign = "left";
       }
@@ -1064,6 +1065,8 @@
       '<textarea class="input" id="impText" spellcheck="false" autocomplete="off" placeholder="日付　出発　到着　路線　機材　機体記号　備考"></textarea>' +
       '<div class="btns"><button type="button" class="btn line" data-act="imp-file">CSVを選ぶ</button>' +
       '<button type="button" class="btn gold" data-act="imp-check">内容を確認</button></div></div>';
+    h += '<div class="card"><h3>デザイン</h3><p class="note">画面と券の色合いを切り替えます。振り返りカードの画像も同じ色合いになります。</p>' +
+      '<div class="themes">' + THEMES.map(themeTileHTML).join("") + "</div></div>";
     h += '<div class="card"><h3>表示</h3><div class="toggle"><div><b>起動アニメーション</b><small>アプリを開いたときに離陸の演出を流します。画面をタップすると飛ばせます。</small></div>' +
       '<button type="button" class="switch' + (db.ui.intro !== false ? " on" : "") + '" data-act="toggle-intro" aria-label="起動アニメーション" aria-pressed="' + (db.ui.intro !== false) + '"><i></i></button></div>' +
       '<div class="btns one"><button type="button" class="btn line" data-act="play-intro">いま再生する</button></div></div>';
@@ -1076,6 +1079,53 @@
       '<div class="btns one"><button type="button" class="btn danger" data-act="wipe">記録をすべて消す</button></div></div>';
     h += '<p class="foot-note">搭乗記録 ' + VERSION + "</p>";
     return h;
+  }
+
+  /* ---------- design themes ---------- */
+  // 色の中身は index.html の [data-theme] にある。meta は iPhone 以外のブラウザの上端の色
+  var THEMES = [
+    { id: "night", name: "夜の機内", desc: "紺と真鍮", meta: "#0C1626" },
+    { id: "dawn", name: "朝の空", desc: "明るい空色", meta: "#3B7BB8" },
+    { id: "dusk", name: "夕焼け", desc: "茜色と紫", meta: "#1C1127" },
+    { id: "classic", name: "クラシック", desc: "昔の紙の航空券", meta: "#6E2530" }
+  ];
+  var THEME = {};
+  THEMES.forEach(function (t) { THEME[t.id] = t; });
+  function themeId() { return THEME[db.ui.theme] ? db.ui.theme : "night"; }
+  function applyTheme(id) {
+    document.documentElement.setAttribute("data-theme", id);
+    var m = $('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", THEME[id].meta);
+  }
+  function themeTileHTML(t) {
+    var on = themeId() === t.id;
+    return '<button type="button" class="theme' + (on ? " on" : "") + '" data-theme="' + t.id + '" data-act="pick-theme" data-id="' + t.id + '" aria-pressed="' + on + '">' +
+      '<div class="mini"><span>HND' + PLANE + "ITM</span><span>12K</span></div>" +
+      "<b>" + esc(t.name) + "</b><small>" + esc(t.desc) + "</small>" +
+      '<i class="ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i></button>';
+  }
+  function pickTheme(id) {
+    if (!THEME[id] || id === themeId()) return;
+    db.ui.theme = id;
+    save();
+    var swap = function () {
+      applyTheme(id);
+      $$(".theme[data-act='pick-theme']").forEach(function (b) {
+        var on = b.dataset.id === id;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    };
+    if (!REDUCE && document.startViewTransition) document.startViewTransition(swap);
+    else swap();
+  }
+  // recap card (canvas) reads the same colors as the screen
+  function themeColors() {
+    var cs = getComputedStyle(document.documentElement);
+    return function (name, alpha) {
+      var v = cs.getPropertyValue("--" + name).trim();
+      return alpha == null ? v : "rgba(" + v + "," + alpha + ")";
+    };
   }
 
   /* ---------- sync ---------- */
@@ -1866,6 +1916,7 @@
         break;
       }
       case "play-intro": playIntro(function () { go("home", { enter: true }); }); break;
+      case "pick-theme": pickTheme(el.dataset.id); break;
       case "jump": {
         var idx = STEPS.findIndex(function (s) { return s.key === el.dataset.key; });
         if (idx >= 0 && idx !== F.step && (idx <= F.max || F.editing)) goStep(idx);
@@ -1970,7 +2021,7 @@
       case "csv-out": shareFile("搭乗記録-" + todayISO() + ".csv", csv(), "text/csv"); break;
       case "wipe":
         if (confirm("端末の記録と窓位置をすべて消します。シートの記録は消えません。続けますか？")) {
-          var keep = db.settings; db = blank(); db.settings = keep; save(); render(); toast("消去しました");
+          var keep = db.settings, keepUi = db.ui; db = blank(); db.settings = keep; db.ui = keepUi; save(); render(); toast("消去しました");
         }
         break;
     }
@@ -2187,6 +2238,7 @@
     el.onclick = skip;
   }
 
+  applyTheme(themeId());
   initBadges();
   if (db.ui.intro === false) {
     $("#intro").classList.add("gone");
