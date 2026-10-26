@@ -240,3 +240,60 @@ test("デザインを切り替えると全体の色が変わり、開き直し�
   expect(await theme()).toBe("classic");
   expect(errors).toEqual([]);
 });
+
+test("保存の途中で「戻る」「閉じる」「記録する」を押しても、二重に記録されない", async ({ page }) => {
+  const errors = await openApp(page);
+  await dismissAwards(page);
+  const n0 = (await db(page)).flights.length;
+  await page.locator("#fab").click();
+  await page.evaluate(() => { const F = window.__skylog.F(); Object.assign(F.d, { airline: "JL", from: "HND", to: "ITM", type: "B737-800", reg: "JA301J" }); F.max = 7; window.__skylog.goStep(7); });
+  await expect(page.locator("#flowNext")).toHaveText("記録する");
+  // 記録した直後、演出が終わる前に連打する
+  const states = await page.evaluate(() => {
+    const $ = (s) => document.querySelector(s);
+    $("#flowNext").click();
+    const s = { back: $("#flowBack").disabled, next: $("#flowNext").disabled };
+    $("#flowBack").click(); $("#flowNext").click(); $('#flow [data-act="flow-close"]').click();
+    return s;
+  });
+  expect(states).toEqual({ back: true, next: true });
+  await expect(page.locator("#flow")).not.toHaveClass(/open/);
+  await expect.poll(async () => (await db(page)).flights.length).toBe(n0 + 1);
+  await page.waitForTimeout(600);
+  expect((await db(page)).flights.filter((f) => f.from === "HND" && f.to === "ITM" && f.reg === "JA301J")).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test("形のおかしいバックアップや保存データでも画面が壊れない。復元をやめても同じファイルを選び直せる", async ({ page }, info) => {
+  const { writeFileSync } = await import("node:fs");
+  const errors = await openApp(page);
+  await dismissAwards(page);
+  // 1便は正しく、1便は日付がないバックアップ
+  const file = info.outputPath("backup.json");
+  writeFileSync(file, JSON.stringify({ flights: [{ id: "ok1", date: "2026-10-20", airline: "JL", from: "HND", to: "ITM", reg: "JA301J" }, { from: "HND" }], windows: {} }));
+  page.once("dialog", (d) => d.dismiss());               // いったん、やめる
+  await page.locator("#fileIn").setInputFiles(file);
+  await expect.poll(() => page.locator("#fileIn").evaluate((i) => i.value)).toBe("");
+  expect((await db(page)).flights.length).toBe(49);
+  page.once("dialog", (d) => d.accept());                // 選び直して、復元する
+  await page.locator("#fileIn").setInputFiles(file);
+  await expect.poll(async () => (await db(page)).flights.length).toBe(1);
+  const f = (await db(page)).flights[0];
+  expect([f.id, f.date, f.note, f.seat, f.config]).toEqual(["ok1", "2026-10-20", "", "", null]);
+
+  // 端末の保存データに壊れた記録が混ざっていても、開き直せば画面が出る
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem("skylog.v1")); d.flights.push({ from: "HND", to: "ITM" }, null); localStorage.setItem("skylog.v1", JSON.stringify(d)); });
+  await page.reload();
+  await skipIntro(page);
+  await expect(page.locator("#app h1")).toHaveText("搭乗記録");
+  expect((await db(page)).flights.length).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test("開発用サーバーは .git などの隠しファイルを出さない（大文字でも）", async ({ request }) => {
+  for (const p of ["/.git/config", "/.GIT/config", "/.Git/HEAD", "/.gitignore", "/node_modules/.package-lock.json", "/NODE_MODULES/.package-lock.json"]) {
+    expect((await request.get(p)).status(), p).toBe(404);
+  }
+  expect((await request.get("/index.html")).status()).toBe(200);
+  expect((await request.get("/app.js")).status()).toBe(200);
+});

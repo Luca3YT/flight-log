@@ -23,7 +23,10 @@ const server = createServer(async (req, res) => {
     if (path.endsWith("/")) path += "index.html";
     const file = normalize(join(ROOT, path));
     if (file !== ROOT && !file.startsWith(ROOT + sep)) { res.writeHead(403).end(); return; }
-    if (file.includes(sep + "node_modules" + sep) || file.includes(sep + ".git")) { res.writeHead(404).end(); return; }
+    // 同じ Wi-Fi から見えるので、node_modules と「.」で始まるもの（.git、.env、.claude など）は出さない。
+    // Windows はファイル名の大文字・小文字を区別しないので、小文字にそろえて調べる（/.GIT/ も止める）
+    const parts = file.slice(ROOT.length).toLowerCase().split(sep).filter(Boolean);
+    if (parts.some((p) => p === "node_modules" || p.startsWith("."))) { res.writeHead(404).end(); return; }
     const info = await stat(file);
     if (!info.isFile()) { res.writeHead(404).end(); return; }
     res.writeHead(200, { "Content-Type": TYPES[extname(file).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });

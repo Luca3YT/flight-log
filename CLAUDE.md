@@ -20,7 +20,7 @@
 | ローカルで開く | `npm run serve` → http://localhost:8080/ |
 | プレビュー版を作る | `npm run preview` → `dist/preview.html`（`npm run serve` 中なら http://localhost:8080/dist/preview.html） |
 | 点検だけ | `npm run check` |
-| 全テスト | `npm test`（点検 → Playwright 14本、2分ほど） |
+| 全テスト | `npm test`（点検 → Playwright 17本、2分ほど） |
 | 番号を上げる | `npm run release -- 1.3.1` |
 
 ## 作業の進め方（るかさんの決まりごと）

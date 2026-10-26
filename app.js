@@ -4,7 +4,7 @@
 
   var D = window.SKYDATA;
   var KEY = "skylog.v1";
-  var VERSION = "1.4.0";
+  var VERSION = "1.4.1";
   var ORDER = ["unknown", "green", "yellow", "red", "black"];
   var RLABEL = { green: "真横", yellow: "ほぼ真横", red: "見にくい", black: "窓なし", unknown: "未判定" };
   var STEPS = [
@@ -190,6 +190,22 @@
     d.merged = true;
     return d;
   }
+  // 記録1件の形をそろえる。日付と区間がない記録は画面が描けなくなるので捨てる（null を返す）
+  function cleanFlight(f) {
+    if (!f || typeof f !== "object") return null;
+    var date = normDate(f.date), from = String(f.from || "").toUpperCase(), to = String(f.to || "").toUpperCase();
+    if (!date || !from || !to) return null;
+    var str = function (v) { return v == null ? "" : String(v); };
+    var now = Date.now();
+    return {
+      id: str(f.id) || uid(), date: date, airline: str(f.airline), from: from, to: to, type: str(f.type),
+      config: f.config ? String(f.config) : null, seat: str(f.seat), reg: str(f.reg), flightNo: str(f.flightNo),
+      note: str(f.note), window: str(f.window), createdAt: +f.createdAt || now, updatedAt: +f.updatedAt || now
+    };
+  }
+  function cleanFlights(list) {
+    return (Array.isArray(list) ? list : []).map(cleanFlight).filter(Boolean);
+  }
   function load() {
     var raw = null;
     try { raw = localStorage.getItem(KEY); } catch (e) { storageOk = false; }
@@ -197,6 +213,10 @@
       try {
         var d = JSON.parse(raw), b = blank();
         Object.keys(b).forEach(function (k) { if (d[k] == null) d[k] = b[k]; });
+        var n0 = Array.isArray(d.flights) ? d.flights.length : -1;
+        d.flights = cleanFlights(d.flights);
+        if (!d.windows || typeof d.windows !== "object") d.windows = {};
+        if (d.flights.length !== n0) d.merged = true;   // 形を直したら保存し直す
         mergeSeed(d);
         if (d.merged) { delete d.merged; persist(d); }
         return d;
@@ -1542,7 +1562,7 @@
     }, REDUCE ? 0 : 210);
   }
   function next() {
-    if (!canNext()) return;
+    if (!F || F.busy || !canNext()) return;
     if (F.step === STEPS.length - 1) return commit();
     goStep(F.step + 1);
   }
@@ -1774,7 +1794,9 @@
   }
 
   function commit() {
-    var d = F.d, now = Date.now();
+    // 保存の演出中（約3秒）は、戻る・閉じる・もう一度記録する を受け付けない（二重登録の防止）
+    var me = F, d = F.d, now = Date.now();
+    F.busy = true; F.saving = true;
     var cfg = getConfig(d.config), info = seatInfo(cfg, d.seat);
     var rec = {
       id: d.id || uid(), date: d.date, airline: d.airline, from: d.from, to: d.to, type: d.type,
@@ -1789,6 +1811,7 @@
     var editing = F.editing;
     var t = $("#flowTicket .ticket");
     $("#flowNext").disabled = true;
+    $("#flowBack").disabled = true;
     var reduce = REDUCE;
     if (t && !reduce) {
       t.classList.remove("live");
@@ -1799,7 +1822,7 @@
       setTimeout(function () { $("#flowTicket").classList.add("lift"); }, 2150);
     }
     setTimeout(function () {
-      closeFlow();
+      if (F === me) closeFlow();
       go("home");
       var hero = $(".hero .ticket");
       if (hero && !reduce && sorted()[0] && sorted()[0].id === rec.id) retrigger(hero, "landed");
@@ -1873,6 +1896,7 @@
       case "stats-more": statsOpen[el.dataset.key] = !statsOpen[el.dataset.key]; render(); break;
 
       case "flow-close":
+        if (F.saving) break;
         if (!F.editing && (F.d.airline || F.d.from) && !confirm("入力中の内容を破棄しますか？")) break;
         closeFlow(); break;
       case "flow-back": if (F.step > 0) goStep(F.step - 1); break;
@@ -2110,14 +2134,20 @@
       if (!file) return;
       var rd = new FileReader();
       rd.onload = function () {
+        t.value = "";   // 先に空にしておく（やめたあと同じファイルを選び直せるように）
+        var o, list;
         try {
-          var o = JSON.parse(String(rd.result));
+          o = JSON.parse(String(rd.result));
           if (!o || !Array.isArray(o.flights)) throw new Error("x");
-          if (!confirm(o.flights.length + "便の記録で、端末の記録を置き換えます。よろしいですか？")) return;
-          db.flights = o.flights; db.windows = o.windows || {}; save(); render();
-          toast("復元しました");
-        } catch (err) { toast("このファイルは読み込めませんでした"); }
-        t.value = "";
+          list = cleanFlights(o.flights);
+          if (o.flights.length && !list.length) throw new Error("x");
+        } catch (err) { toast("このファイルは読み込めませんでした"); return; }
+        var skipped = o.flights.length - list.length;
+        if (!confirm(list.length + "便の記録で、端末の記録を置き換えます。" + (skipped ? "日付か区間が読めない " + skipped + " 便は入りません。" : "") + "よろしいですか？")) return;
+        db.flights = list;
+        db.windows = o.windows && typeof o.windows === "object" ? o.windows : {};
+        save(); render();
+        toast("復元しました");
       };
       rd.readAsText(file);
     }
