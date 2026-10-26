@@ -297,3 +297,50 @@ test("開発用サーバーは .git などの隠しファイルを出さない�
   expect((await request.get("/index.html")).status()).toBe(200);
   expect((await request.get("/app.js")).status()).toBe(200);
 });
+
+test("どの座席仕様も窓位置の画面で描けて、席の数が宣言どおり。欠番の列は出ない", async ({ page }) => {
+  const errors = await openApp(page);
+  await page.evaluate(() => window.__skylog.go("windows"));
+  const ids = await page.evaluate(() => window.SKYDATA.CONFIGS.filter((c) => c.src === "official").map((c) => [c.id, c.seats]));
+  for (const [id, seats] of ids) {
+    await page.locator("#wcfg").selectOption(id);
+    await expect(page.locator("#wcabin .seat[data-seat]")).toHaveCount(seats);
+  }
+  await page.locator("#wcfg").selectOption("JL-763-A25");
+  await expect(page.locator('#wcabin .crow[data-row="24"]')).toHaveCount(0);
+  await expect(page.locator('#wcabin [data-seat="21K"]')).toHaveCount(0);
+  await page.locator('#wcabin [data-seat="29K"]').click();
+  expect((await db(page)).windows["JL-763-A25"]["29K"]).toBeTruthy();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  expect(errors).toEqual([]);
+});
+
+test("座席の文字が変わった仕様の古い記録は、一度だけ新しい文字に読み替える", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const o = JSON.parse(JSON.stringify(window.__skylog.db()));
+    delete o.seatMapVersion;
+    o.windows["JL-E70"] = { "12A": "green", "12D": "red" };
+    o.flights[0].config = "JL-E70"; o.flights[0].seat = "12D";
+    o.flights[1].config = "NH-763"; o.flights[1].seat = "20E";
+    o.flights[2].config = "JL-738-V35"; o.flights[2].seat = "12D";
+    localStorage.setItem("skylog.v1", JSON.stringify(o));
+  });
+  await page.reload();
+  await page.locator("#app .view").waitFor();
+  let d = await db(page);
+  expect(d.windows["JL-E70"]).toEqual({ "12A": "green", "12K": "red" });
+  expect(d.flights.slice(0, 3).map((f) => f.seat)).toEqual(["12K", "20F", "12D"]);
+  expect(d.seatMapVersion).toBe(2);
+  expect(d.windows["JL-738-V35"]["10K"]).toBe("green");
+  // 2回目は読み替えない
+  await page.evaluate(() => {
+    const o = JSON.parse(localStorage.getItem("skylog.v1"));
+    o.flights[0].seat = "12C";
+    localStorage.setItem("skylog.v1", JSON.stringify(o));
+  });
+  await page.reload();
+  await page.locator("#app .view").waitFor();
+  d = await db(page);
+  expect(d.flights[0].seat).toBe("12C");
+});

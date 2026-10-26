@@ -1,7 +1,7 @@
 /* 搭乗記録 — Service Worker
  * 更新したら CACHE の番号を上げること（上げないと古い画面が残ります）
  */
-var CACHE = "skylog-v1.4.1";
+var CACHE = "skylog-v1.4.2";
 var SHELL = ["./", "index.html", "app.js", "data.js", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", function (e) {

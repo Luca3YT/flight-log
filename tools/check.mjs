@@ -6,6 +6,7 @@
 // - sw.js がキャッシュするファイルが実在するか
 // - Code.gs に本物の合言葉が入っていないか（リポジトリは公開）
 // - デザイン4種類の色の変数がそろっているか
+// - 座席表の席数が宣言（seats）と合うか（公式の座席表は不一致なら失敗、目安は注意だけ）
 import { readFile, access } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { file, readVersions } from "./version.mjs";
@@ -60,6 +61,35 @@ else {
   if (!base) problems.push("index.html にデザインの色（夜の機内）のブロックがありません");
   else if (lacks.length) problems.push("デザインの色の変数がそろっていません\n  " + lacks.join("\n  "));
   else ok(`デザイン4種類の色の変数（${base.size}個ずつ）`);
+}
+
+// 座席表の席数が宣言（seats）と合うか。数え方は app.js の rowLayout と同じく rows の例外を優先（"" は欠番の列）
+{
+  const vm = await import("node:vm");
+  const ctx = { window: {} };
+  vm.runInNewContext(await readFile(file("data.js"), "utf8"), ctx);
+  const rowLayout = (c, r) => {
+    if (c.rows && c.rows[r] != null) return c.rows[r] || null;
+    for (const k of c.cabins) if (r >= k.from && r <= k.to) return k.layout;
+    return null;
+  };
+  const bad = [], approx = [];
+  for (const c of ctx.window.SKYDATA.CONFIGS) {
+    let n = 0;
+    const seats = new Set();
+    for (const k of c.cabins) for (let r = k.from; r <= k.to; r++) {
+      const lay = rowLayout(c, r);
+      if (!lay) continue;
+      for (const ch of lay.replace(/[|-]/g, "")) { n++; seats.add(r + ch); }
+    }
+    const lost = (c.noWindow || []).filter((s) => !seats.has(s));
+    if (lost.length) bad.push(`${c.id}: 窓なしの席 ${lost.join("、")} が座席表にない`);
+    if (n === c.seats) continue;
+    (c.src === "official" ? bad : approx).push(`${c.id}: 宣言 ${c.seats}席 / 座席表 ${n}席`);
+  }
+  if (bad.length) problems.push("座席表の席数が合いません\n  " + bad.join("\n  "));
+  else ok(`座席表の席数（公式の座席表 ${ctx.window.SKYDATA.CONFIGS.filter((c) => c.src === "official").length}仕様が一致）`);
+  if (approx.length) console.log("  注意 目安の座席表で席数が合わないもの（公式の座席表が見つかっていない）\n        " + approx.join("\n        "));
 }
 
 const gs = await readFile(file("gas/Code.gs"), "utf8");

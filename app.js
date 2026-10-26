@@ -4,7 +4,7 @@
 
   var D = window.SKYDATA;
   var KEY = "skylog.v1";
-  var VERSION = "1.4.1";
+  var VERSION = "1.4.2";
   var ORDER = ["unknown", "green", "yellow", "red", "black"];
   var RLABEL = { green: "真横", yellow: "ほぼ真横", red: "見にくい", black: "窓なし", unknown: "未判定" };
   var STEPS = [
@@ -158,7 +158,37 @@
   /* ---------- storage ---------- */
   var storageOk = true;
   function blank() {
-    return { v: 1, flights: [], windows: {}, settings: { gasUrl: "", token: "" }, outbox: [], lastSync: 0, lastError: "", ui: {} };
+    return { v: 1, flights: [], windows: {}, settings: { gasUrl: "", token: "" }, outbox: [], lastSync: 0, lastError: "", ui: {}, seatMapVersion: SEAT_MAP_VERSION };
+  }
+  // 座席表を公式に合わせたとき（1.4.2）に席の文字が変わった仕様。[列の始め, 終わり, { 古い文字: 新しい文字 }]
+  var SEAT_MAP_VERSION = 2;
+  var SEAT_RENAMES = {
+    "JL-E70": [[1, 99, { B: "C", C: "H", D: "K" }]],
+    "JL-763-A25": [[1, 1, { E: "D" }]],
+    "NH-763": [[1, 2, { E: "D" }], [3, 99, { E: "F" }]],
+    "NH-772": [[1, 3, { E: "F" }]],
+    "NH-773": [[1, 3, { E: "F" }]]
+  };
+  function renameSeat(cid, seat) {
+    var m = String(seat || "").toUpperCase().match(/^(\d{1,2})([A-Z])$/), rules = SEAT_RENAMES[cid];
+    if (!m || !rules) return seat;
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (+m[1] >= r[0] && +m[1] <= r[1] && r[2][m[2]]) return m[1] + r[2][m[2]];
+    }
+    return seat;
+  }
+  function migrateSeats(d) {
+    Object.keys(SEAT_RENAMES).forEach(function (cid) {
+      var w = d.windows[cid];
+      if (w) {
+        var nw = {};
+        Object.keys(w).forEach(function (k) { nw[renameSeat(cid, k)] = w[k]; });
+        d.windows[cid] = nw;
+      }
+    });
+    d.flights.forEach(function (f) { if (f.config && f.seat) f.seat = renameSeat(f.config, f.seat); });
+    d.seatMapVersion = SEAT_MAP_VERSION;
   }
   function seedDb() {
     var db = blank(), now = Date.now();
@@ -211,13 +241,14 @@
     try { raw = localStorage.getItem(KEY); } catch (e) { storageOk = false; }
     if (raw) {
       try {
-        var d = JSON.parse(raw), b = blank();
+        var d = JSON.parse(raw), b = blank(), smv = (d && d.seatMapVersion) || 1;
         Object.keys(b).forEach(function (k) { if (d[k] == null) d[k] = b[k]; });
         var n0 = Array.isArray(d.flights) ? d.flights.length : -1;
         d.flights = cleanFlights(d.flights);
         if (!d.windows || typeof d.windows !== "object") d.windows = {};
         if (d.flights.length !== n0) d.merged = true;   // 形を直したら保存し直す
         mergeSeed(d);
+        if (smv < SEAT_MAP_VERSION) { migrateSeats(d); d.merged = true; }   // 座席の文字が変わった仕様を一度だけ読み替える
         if (d.merged) { delete d.merged; persist(d); }
         return d;
       } catch (e) { /* fall through */ }
@@ -302,7 +333,7 @@
     return CFG[id] || null;
   }
   function rowLayout(cfg, row) {
-    if (cfg.rows && cfg.rows[row]) return cfg.rows[row];
+    if (cfg.rows && cfg.rows[row] != null) return cfg.rows[row] || null;   // "" は欠番の列
     for (var i = 0; i < cfg.cabins.length; i++) {
       var c = cfg.cabins[i];
       if (row >= c.from && row <= c.to) return c.layout;
@@ -2078,7 +2109,7 @@
         btn.className = btn.className.replace(/\b(green|yellow|red|black|unknown|pop)\b/g, "").trim() + " " + nx;
         retrigger(btn, "pop");
         var rowEl = btn.closest(".crow"), wins = rowEl.querySelectorAll(".win");
-        var lay = rowLayout(getConfig(cid), parseInt(seat, 10)), w = winLetters(lay);
+        var lay = rowLayout(getConfig(cid), parseInt(seat, 10)) || "", w = winLetters(lay);
         var letter = seat.slice(-1);
         var markEl = letter === w.L ? wins[0] : wins[wins.length - 1];
         if (markEl) markEl.className = "win " + nx;
